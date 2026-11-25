@@ -9,6 +9,39 @@ from lxml import etree
 from docx_common import load_profile, parse_xml, paragraphs, read_docx, sha256_file, qn, NS
 
 
+def replace_paragraph_text(paragraph, text):
+    for run in list(paragraph._p.findall(qn('w:r'))):
+        if run.find('w:fldChar', NS) is not None or run.find('w:instrText', NS) is not None:
+            paragraph._p.remove(run)
+    nodes = paragraph._p.findall('.//' + qn('w:t'))
+    if not nodes:
+        paragraph.add_run(text)
+        return
+    nodes[0].text = text
+    for node in nodes[1:]:
+        node.text = ''
+
+
+def apply_cover_template(document, fields, role_nodes):
+    if len(document.paragraphs) < 21:
+        raise ValueError('Cover template must contain the official 21 cover paragraphs')
+    sect = '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}sectPr'
+    for child in list(document._element.body)[21:]:
+        if child.tag != sect:
+            document._element.body.remove(child)
+    replace_paragraph_text(document.paragraphs[5], fields['title'])
+    labels = ['部   院  系：', '专       业：', '学       号：', '学 生 姓 名：', '指 导 教 师：', '指导教师职称：', '指导教师单位：']
+    values = [fields['department'], fields['major'], fields['student_id'], fields['student_name'], fields['advisor'], fields['advisor_title'], fields['advisor_unit']]
+    for index, label, value in zip(range(9, 16), labels, values):
+        replace_paragraph_text(document.paragraphs[index], label + value)
+    replace_paragraph_text(document.paragraphs[17], fields['date'])
+    roles = ['image', 'cover_main_title', 'blank', 'blank', 'cover_label', 'cover_title', 'cover_other',
+             'blank', 'blank', 'cover_meta', 'cover_meta', 'cover_meta', 'cover_meta', 'cover_meta',
+             'cover_meta', 'cover_meta', 'blank', 'cover_date', 'blank', 'blank', 'blank']
+    for paragraph, role in zip(document.paragraphs[:21], roles):
+        role_nodes.append((paragraph._p, {'role': role}))
+
+
 def build(content_path, output, plan_path):
     for path in (output, plan_path):
         if path.exists():
@@ -17,10 +50,16 @@ def build(content_path, output, plan_path):
         raise ValueError("Input and outputs must have different paths")
     content = json.loads(content_path.read_text(encoding="utf-8-sig"))
     profile = load_profile()
-    d = Document()
+    role_nodes = []
+    template = content.get('cover_template')
+    if template:
+        template_path = (Path(__file__).resolve().parent.parent / 'assets' / 'cover-template.docx') if template == 'bundled' else Path(template)
+        d = Document(template_path)
+        apply_cover_template(d, content['cover_fields'], role_nodes)
+    else:
+        d = Document()
     d.core_properties.author = ""
     d.core_properties.last_modified_by = ""
-    role_nodes = []
     table_plan = {}
     for block in content["blocks"]:
         kind = block.get("type", "paragraph")

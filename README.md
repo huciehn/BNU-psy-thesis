@@ -12,7 +12,7 @@ Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复�
 
 机构规范固定为所附来源版本；其他学校或新版规范须提供自己的profile和来源，不能直接声称通用高校格式。
 
-实际最终分页需要本机Word/WPS，或LibreOffice加逐页复核；中文宋体、黑体和Times New Roman须可用。默认使用 `assets/cover-template.docx` 的首页封面模板，用户有新版官方样例时可作为 `scripts/make_cover.py` 的模板参数替换；缺失研究材料仍需用户提供。当前开发环境实测WPS原生更新目录、保存DOCX及渲染；Word接口与LibreOffice路径需在各自安装环境进一步验证。
+实际最终分页需要本机Word/WPS，或LibreOffice加逐页复核；中文宋体、黑体和Times New Roman须可用。默认复制 `assets/cover-template.docx` 的官方首页版式并替换封面字段，保留校徽、下划线和信息栏结构；用户有新版官方样例时可作为 `scripts/make_cover.py` 的模板参数替换。缺失研究材料仍需用户提供。当前开发环境实测WPS原生更新目录、保存DOCX及渲染；Word接口与LibreOffice路径需在各自安装环境进一步验证。
 
 ## 使用
 

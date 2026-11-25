@@ -77,15 +77,23 @@ def main():
         for block in blocks:
             if block.get("type") == "image" and not Path(block["path"]).is_absolute():
                 block["path"] = str((args.content.parent / block["path"]).resolve())
-        logo = args.output.parent / "cover-logo.png"
-        if logo.exists():
-            raise ValueError("Refusing to overwrite: " + str(logo))
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        extract_logo(args.template, logo)
-        content["blocks"] = make_blocks(args, logo.name) + blocks
+        content["cover_template"] = "bundled" if args.template.resolve() == (ROOT / "assets" / "cover-template.docx").resolve() else str(args.template.resolve())
+        content["cover_fields"] = {
+            "title": args.title,
+            "department": args.department,
+            "major": args.major,
+            "student_id": args.student_id,
+            "student_name": args.student_name,
+            "advisor": args.advisor,
+            "advisor_title": args.advisor_title,
+            "advisor_unit": args.advisor_unit,
+            "date": args.date,
+        }
+        content["blocks"] = blocks
         with args.output.open("x", encoding="utf-8") as handle:
             json.dump(content, handle, ensure_ascii=False, indent=2)
-        print("Cover content: %s\nLogo: %s" % (args.output, logo))
+        print("Cover content: %s" % args.output)
     except Exception as exc:
         print("ERROR: " + str(exc), file=sys.stderr)
         return 1

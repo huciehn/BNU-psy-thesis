@@ -768,6 +768,7 @@ def format_document(input_path, plan_path, profile_path=None):
     records, first_body_section = prepare_sections(root, ps, plan['paragraphs'], profile)
     configure_footers(parts, records, first_body_section, profile)
     settings = parse_xml(parts['word/settings.xml']) if 'word/settings.xml' in parts else etree.Element(qn('w:settings'), nsmap={'w': NS['w']})
+    boolprop(settings, 'w:doNotCompressPictures', True)
     boolprop(settings, 'w:updateFields', True)
     parts['word/settings.xml'] = xml_bytes(settings)
     register_standard_parts(parts)

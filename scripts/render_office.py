@@ -11,6 +11,26 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def restore_media_bytes(source, rendered):
+    import zipfile
+    def parts(path):
+        with zipfile.ZipFile(path) as package:
+            return {name: package.read(name) for name in package.namelist()}
+    original = parts(source)
+    current = parts(rendered)
+    original_media = {name for name in original if name.startswith('word/media/') and not name.endswith('/')}
+    current_media = {name for name in current if name.startswith('word/media/') and not name.endswith('/')}
+    if original_media != current_media:
+        raise ValueError('Office changed the set of embedded images; manual review is required')
+    for name in original_media:
+        current[name] = original[name]
+    temporary = rendered.with_name(rendered.stem + '-media-restored.docx')
+    with zipfile.ZipFile(temporary, 'w', zipfile.ZIP_DEFLATED) as package:
+        for name, data in current.items():
+            package.writestr(name, data)
+    temporary.replace(rendered)
+
+
 def render_once(source, output_dir, backend, executable=None):
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError("Use a new or empty output directory; no outputs are overwritten")
@@ -77,6 +97,8 @@ def render_once(source, output_dir, backend, executable=None):
         # A conversion is a render, not proof that the editable file's TOC was saved.
         shutil.copy2(generated, pdf)
         updated = None
+    if updated:
+        restore_media_bytes(source, updated)
     if sha(source) != before:
         raise ValueError("Original file changed unexpectedly")
     if not pdf.is_file() or pdf.stat().st_size == 0:

@@ -26,7 +26,7 @@ import update_skill
 from update_skill import version_tuple
 from site_check import validate_credentials
 from make_cover import extract_logo, make_blocks
-from render_office import pad_before_body
+from render_office import pad_before_body, restore_media_bytes
 
 
 def create_fixture(folder, full=False, form=False):
@@ -145,6 +145,8 @@ class EngineTests(unittest.TestCase):
         self.assertTrue(report["structural_pass"], report["errors"])
         self.assertFalse(report["ready_to_submit"])
         self.assertIn("physical_odd_pages", report["pending_reviews"])
+        settings = read_docx(out)['word/settings.xml']
+        self.assertIn(b'doNotCompressPictures', settings)
 
     def test_form_is_not_converted_to_research_table(self):
         src, out, plan, changes = self.formatted(form=True)
@@ -375,6 +377,41 @@ class EngineTests(unittest.TestCase):
         root = etree.fromstring(parts['word/document.xml'])
         names = root.xpath('.//w:bookmarkStart/@w:name', namespaces=NS)
         self.assertIn('bnu_psy_thesis_p00013', names)
+
+    def test_cover_template_build_preserves_underlines_and_logo(self):
+        content = self.folder / 'template-cover-content.json'
+        content.write_text(json.dumps({
+            'cover_template': 'bundled',
+            'cover_fields': {'title': '双语儿童感数能力的发展', 'department': '心理学部', 'major': '心理学',
+                             'student_id': '202421161111', 'student_name': '格式测试', 'advisor': '格式测试',
+                             'advisor_title': '格式测试', 'advisor_unit': '北京师范大学心理学部', 'date': '2026年11月25日'},
+            'blocks': [{'role': 'abstract_title_cn', 'text': '双语儿童感数能力的发展'}]
+        }), encoding='utf-8')
+        src, pp = self.folder / 'template-cover.docx', self.folder / 'template-cover-plan.json'
+        build(content, src, pp)
+        document = Document(src)
+        self.assertEqual(document.paragraphs[5].text, '双语儿童感数能力的发展')
+        self.assertEqual(len(document.inline_shapes), 1)
+        self.assertEqual(document.paragraphs[5].runs[0].underline, True)
+        for index in list(range(9, 16)) + [17]:
+            self.assertNotIn('MACROBUTTON', document.paragraphs[index]._p.xml)
+        data, _ = format_document(src, pp)
+        out = self.folder / 'template-cover-formatted.docx'
+        out.write_bytes(data)
+        report = validate(out, json.loads(pp.read_text(encoding='utf-8')), src, mode='partial')
+        self.assertTrue(report['structural_pass'], report['errors'])
+
+    def test_render_restores_original_image_bytes(self):
+        src, _, _ = create_fixture(self.folder)
+        parts = read_docx(src)
+        media = next(name for name in parts if name.startswith('word/media/'))
+        parts[media] = b'office-recompressed-image'
+        rendered = self.folder / 'office-output.docx'
+        with zipfile.ZipFile(rendered, 'w') as z:
+            for name, data in parts.items():
+                z.writestr(name, data)
+        restore_media_bytes(src, rendered)
+        self.assertEqual(read_docx(rendered)[media], read_docx(src)[media])
 
 
 if __name__ == "__main__":
