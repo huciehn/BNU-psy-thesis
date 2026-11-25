@@ -400,6 +400,8 @@ class EngineTests(unittest.TestCase):
         out.write_bytes(data)
         report = validate(out, json.loads(pp.read_text(encoding='utf-8')), src, mode='partial')
         self.assertTrue(report['structural_pass'], report['errors'])
+        spacing = Document(out).paragraphs[1]._p.find('w:pPr/w:spacing', NS)
+        self.assertEqual(spacing.get(qn('w:lineRule')), 'auto')
 
     def test_render_restores_original_image_bytes(self):
         src, _, _ = create_fixture(self.folder)
