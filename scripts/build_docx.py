@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from docx import Document
 from docx.oxml import OxmlElement
-from docx.shared import Cm
+from docx.shared import Cm, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from lxml import etree
 from docx_common import load_profile, parse_xml, paragraphs, read_docx, sha256_file, qn, NS
 
@@ -22,6 +23,15 @@ def replace_paragraph_text(paragraph, text):
         node.text = ''
 
 
+def set_cover_font(paragraph, cn_font, size_pt):
+    for run in paragraph.runs:
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(size_pt)
+        run.font.bold = True
+        fonts = run._element.get_or_add_rPr().get_or_add_rFonts()
+        fonts.set(qn('w:eastAsia'), cn_font)
+
+
 def apply_cover_template(document, fields, role_nodes):
     if len(document.paragraphs) < 21:
         raise ValueError('Cover template must contain the official 21 cover paragraphs')
@@ -35,9 +45,17 @@ def apply_cover_template(document, fields, role_nodes):
     for index, label, value in zip(range(9, 16), labels, values):
         replace_paragraph_text(document.paragraphs[index], label + value)
     replace_paragraph_text(document.paragraphs[17], fields['date'])
-    roles = ['image', 'cover_main_title', 'blank', 'blank', 'cover_label', 'cover_title', 'cover_other',
-             'blank', 'blank', 'cover_meta', 'cover_meta', 'cover_meta', 'cover_meta', 'cover_meta',
-             'cover_meta', 'cover_meta', 'blank', 'cover_date', 'blank', 'blank', 'blank']
+    set_cover_font(document.paragraphs[4], '黑体', 16)
+    set_cover_font(document.paragraphs[5], '宋体', 16)
+    document.paragraphs[5].alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    for index in range(9, 16):
+        set_cover_font(document.paragraphs[index], '宋体', 14)
+        document.paragraphs[index].alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    set_cover_font(document.paragraphs[17], '宋体', 10.5)
+    document.paragraphs[17].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    roles = ['image', 'cover_main_title', 'cover_other', 'cover_other', 'cover_label', 'cover_title', 'cover_other',
+             'cover_other', 'cover_other', 'cover_meta', 'cover_meta', 'cover_meta', 'cover_meta', 'cover_meta',
+             'cover_meta', 'cover_meta', 'cover_other', 'cover_date', 'cover_other', 'cover_other', 'cover_other']
     for paragraph, role in zip(document.paragraphs[:21], roles):
         role_nodes.append((paragraph._p, {'role': role}))
 

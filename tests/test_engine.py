@@ -401,9 +401,15 @@ class EngineTests(unittest.TestCase):
         report = validate(out, json.loads(pp.read_text(encoding='utf-8')), src, mode='partial')
         self.assertTrue(report['structural_pass'], report['errors'])
         spacing = Document(out).paragraphs[1]._p.find('w:pPr/w:spacing', NS)
-        self.assertEqual(spacing.get(qn('w:lineRule')), 'auto')
+        self.assertNotEqual(spacing.get(qn('w:lineRule')) if spacing is not None else None, 'exact')
         info_indent = Document(out).paragraphs[9]._p.find('w:pPr/w:ind', NS)
         self.assertEqual(info_indent.get(qn('w:firstLineChars')), '400')
+        for index in (1, 4, 5, 9, 17):
+            before = Document(src).paragraphs[index]._p.find('w:pPr/w:spacing', NS)
+            after = Document(out).paragraphs[index]._p.find('w:pPr/w:spacing', NS)
+            keys = ('before', 'after', 'beforeLines', 'afterLines', 'line', 'lineRule')
+            self.assertEqual({k: before.get(qn('w:' + k)) if before is not None else None for k in keys},
+                             {k: after.get(qn('w:' + k)) if after is not None else None for k in keys})
 
     def test_render_restores_original_image_bytes(self):
         src, _, _ = create_fixture(self.folder)
