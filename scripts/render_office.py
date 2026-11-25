@@ -100,7 +100,7 @@ def pad_before_body(source, output, plan):
     body = root.find("w:body", NS)
     pid = next((k for k, v in plan["paragraphs"].items() if v["role"] == "heading1"), None)
     if not pid: raise ValueError("Cannot identify the first body heading from the reviewed plan")
-    mark = root.find('.//w:bookmarkStart[@w:name="BNU-psy-thesis_' + pid + '"]', NS)
+    mark = root.find('.//w:bookmarkStart[@w:name="bnu_psy_thesis_' + pid + '"]', NS)
     if mark is None: raise ValueError("Body bookmark is missing")
     paragraph = next(mark.iterancestors(qn("w:p")), None)
     if paragraph is None or paragraph.getparent() is not body:

@@ -26,6 +26,7 @@ import update_skill
 from update_skill import version_tuple
 from site_check import validate_credentials
 from make_cover import extract_logo, make_blocks
+from render_office import pad_before_body
 
 
 def create_fixture(folder, full=False, form=False):
@@ -365,6 +366,15 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(len(document.paragraphs), 21)
         self.assertEqual(len(document.inline_shapes), 1)
         self.assertIn('本科生毕业论文(设计)', document.paragraphs[1].text)
+
+    def test_physical_page_padding_finds_body_bookmark(self):
+        src, out, plan, _ = self.formatted(full=True)
+        padded = self.folder / 'physical-padding.docx'
+        pad_before_body(out, padded, plan)
+        parts = read_docx(padded)
+        root = etree.fromstring(parts['word/document.xml'])
+        names = root.xpath('.//w:bookmarkStart/@w:name', namespaces=NS)
+        self.assertIn('bnu_psy_thesis_p00013', names)
 
 
 if __name__ == "__main__":
