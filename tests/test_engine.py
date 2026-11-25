@@ -402,6 +402,8 @@ class EngineTests(unittest.TestCase):
         self.assertTrue(report['structural_pass'], report['errors'])
         spacing = Document(out).paragraphs[1]._p.find('w:pPr/w:spacing', NS)
         self.assertEqual(spacing.get(qn('w:lineRule')), 'auto')
+        info_indent = Document(out).paragraphs[9]._p.find('w:pPr/w:ind', NS)
+        self.assertEqual(info_indent.get(qn('w:firstLineChars')), '400')
 
     def test_render_restores_original_image_bytes(self):
         src, _, _ = create_fixture(self.folder)

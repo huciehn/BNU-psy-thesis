@@ -57,7 +57,7 @@ def package(output_dir):
                 data = file.read_bytes()
                 z.writestr("BNU-psy-thesis/" + relative, data)
                 records.append({"path": relative, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
-    result = {"version": "2.4.3", "archive": target.name,
+    result = {"version": "2.4.4", "archive": target.name,
               "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
               "files": records, "excluded": ["_local", "dist", "private source documents", "credentials"]}
     with manifest.open("x", encoding="utf-8") as handle: json.dump(result, handle, ensure_ascii=False, indent=2)
