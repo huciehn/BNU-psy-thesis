@@ -1,0 +1,45 @@
+{
+  "source_version": "provided-2021-revised-materials",
+  "sources": [
+    {
+      "filename": "1-心理学部本科生毕业论文开题报告的相关要求.doc",
+      "sha256": "ad357895547093ba4ed020f14d420963475e8e528635e77be243e2f365b65b5a",
+      "id": "S1"
+    },
+    {
+      "filename": "2-心理学部毕业论文格式规范-修订版.docx",
+      "sha256": "be54f0f51e0cf8cb3a243d9c56b560dd2cc34a57e51db247796b3e9fb6226567",
+      "id": "S2"
+    },
+    {
+      "filename": "3-心理学部本科毕业论文排版样例(四校版）20250418 (1).docx",
+      "sha256": "84fa2153df3f4eff9f27544e94873514254cf806ab7f5a00745c10357469ff6a",
+      "id": "S3"
+    },
+    {
+      "filename": "4-心理学部图表格式规范.docx",
+      "sha256": "e01802dba305c8f5b9979357ebf97f9457189546b470b2ed5faa9cfb01e75097",
+      "id": "S4"
+    },
+    {
+      "filename": "5-心理学部本科生毕业论文指导记录册填写要求.docx",
+      "sha256": "6666d5ca40042883cb9a0fc1d188b2a6897051fdfc1415007286950faf38578e",
+      "id": "S5"
+    },
+    {
+      "filename": "6-心理学部学位论文提交自查表.docx",
+      "sha256": "c4b9aeb9cbfc6178a376370ff854605b72c658786d435b6d902ce9c9dfcc8288",
+      "id": "S6"
+    },
+    {
+      "filename": "附件1：常见统计符号列表和释义.pdf",
+      "sha256": "a7fcc1097d27e1e1bae3140651194676b75158e1a64b5b79545b31d97a554dfc",
+      "id": "S7"
+    },
+    {
+      "filename": "附件2：心理学常见统计图表示例.docx",
+      "sha256": "f2cea0c885a42323d6746d2edc7afc426304e2b35afe4e4098d0e567c40e42f5",
+      "id": "S8"
+    }
+  ]
+}

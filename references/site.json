@@ -1,0 +1,6 @@
+{
+  "entry": "http://172.24.123.52/",
+  "credentials_file": "~/.claude/secrets/BNU-psy-thesis-site.json",
+  "max_upload_mib": 10,
+  "report_timeout_seconds": 300
+}

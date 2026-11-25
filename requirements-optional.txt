@@ -1,0 +1,3 @@
+# Optional local office/PDF inspection; not required by the formatter.
+pywin32>=306; sys_platform == 'win32'
+PyMuPDF>=1.23,<2

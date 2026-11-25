@@ -1,0 +1,6 @@
+_local/
+dist/
+__pycache__/
+*.pyc
+.venv/
+~$*
