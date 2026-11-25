@@ -19,10 +19,10 @@ python "S/scripts/render_office.py" "P/formatted.docx" --backend wps --plan "P/p
 python "S/scripts/site_check.py" --upload "P/final.docx" --report-dir "P/site-report" --language 中文 --yes
 ```
 
-新写作需要封面时，官方样例由用户提供。以下命令提取首页校徽并在内容文件前加入检测兼容封面；已有封面须审阅后显式使用`--replace-cover`：
+新写作需要封面时，默认使用`assets/cover-template.docx`首页模板，用户也可提供新版官方样例替换。以下命令提取首页校徽并在内容文件前加入检测兼容封面；已有封面须审阅后显式使用`--replace-cover`：
 
 ```text
-python "S/scripts/make_cover.py" "官方样例.docx" --content "P/content.json" --output "P/content-with-cover.json" --replace-cover --title "论文题目" --student-id "12位学号" --student-name "姓名" --advisor "导师姓名" --advisor-title "导师职称"
+python "S/scripts/make_cover.py" --content "P/content.json" --output "P/content-with-cover.json" --replace-cover --title "论文题目" --student-id "12位学号" --student-name "姓名" --advisor "导师姓名" --advisor-title "导师职称"
 ```
 
 清点后须由代理审阅全文并编制plan，不能直接将suggested_role视为已确认角色。未决修订先由用户决定接受/拒绝范围，保留原件。旧DOC先转新DOCX并核对；扫描件须恢复结构并记录OCR不确定处。

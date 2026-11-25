@@ -12,7 +12,7 @@ Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复�
 
 机构规范固定为所附来源版本；其他学校或新版规范须提供自己的profile和来源，不能直接声称通用高校格式。
 
-实际最终分页需要本机Word/WPS，或LibreOffice加逐页复核；中文宋体、黑体和Times New Roman须可用。官方封面由用户提供样例后通过 `scripts/make_cover.py` 提取，公开包不包含校方原件；缺失研究材料仍需用户提供。当前开发环境实测WPS原生更新目录、保存DOCX及渲染；Word接口与LibreOffice路径需在各自安装环境进一步验证。
+实际最终分页需要本机Word/WPS，或LibreOffice加逐页复核；中文宋体、黑体和Times New Roman须可用。默认使用 `assets/cover-template.docx` 的首页封面模板，用户有新版官方样例时可作为 `scripts/make_cover.py` 的模板参数替换；缺失研究材料仍需用户提供。当前开发环境实测WPS原生更新目录、保存DOCX及渲染；Word接口与LibreOffice路径需在各自安装环境进一步验证。
 
 ## 使用
 
@@ -26,7 +26,7 @@ Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复�
 
 ## 开源边界
 
-原创代码、技能说明与重新表述的规则采用MIT许可证。原始校方DOCX/PDF、原技能备份、本机审计、论文样例与个人文件保留在 `_local/`，不会进入发布包。公开来源索引保留文件名、哈希和证据位置，未包含本机私人路径和账号。第三方原件不因本项目许可证而获得重新许可。
+原创代码、技能说明与重新表述的规则采用MIT许可证。完整校方DOCX/PDF、原技能备份、本机审计、论文样例与个人文件保留在 `_local/`，不会进入发布包。公开包仅包含 `assets/cover-template.docx` 首页模板，该模板属于第三方材料，不因本项目MIT许可证而获得重新许可。公开来源索引保留文件名、哈希和证据位置，未包含本机私人路径和账号。
 
 ## 验证与打包
 

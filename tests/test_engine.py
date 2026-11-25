@@ -360,6 +360,12 @@ class EngineTests(unittest.TestCase):
         self.assertFalse((old_root / 'dist' / 'old.skill').exists())
         self.assertEqual((backup / 'dist' / 'old.skill').read_bytes(), b'old-release')
 
+    def test_bundled_cover_template(self):
+        document = Document(ROOT / 'assets' / 'cover-template.docx')
+        self.assertEqual(len(document.paragraphs), 21)
+        self.assertEqual(len(document.inline_shapes), 1)
+        self.assertIn('本科生毕业论文(设计)', document.paragraphs[1].text)
+
 
 if __name__ == "__main__":
     unittest.main()

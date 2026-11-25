@@ -8,6 +8,8 @@ import sys
 
 from docx import Document
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def make_blocks(args, logo_name):
     return [
@@ -43,7 +45,7 @@ def extract_logo(template, destination):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("template", type=Path)
+    parser.add_argument("template", type=Path, nargs="?", default=ROOT / "assets" / "cover-template.docx")
     parser.add_argument("--content", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--title", required=True)
