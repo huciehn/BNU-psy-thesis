@@ -83,7 +83,7 @@ def install(staging_parent, expected_root):
     )
     if completed.returncode:
         raise ValueError("Release tests failed: " + (completed.stderr or completed.stdout)[-2000:])
-    root_files = {"SKILL.md", "README.md", "PROJECT.md", "LICENSE", "requirements.txt", "requirements-optional.txt", ".gitignore"}
+    root_files = {"SKILL.md", "README.md", "LICENSE", "requirements.txt", "requirements-optional.txt", ".gitignore"}
     trees = {"scripts": {".py"}, "references": {".md", ".json"}, "tests": {".py"}, "examples": {".json"}}
     def public_files(base):
         result = [base / name for name in root_files if (base / name).is_file()]
@@ -125,6 +125,14 @@ def install(staging_parent, expected_root):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
         raise
+    archive = staging_parent / "BNU-psy-thesis.skill"
+    manifest = staging_parent / "manifest.json"
+    if archive.is_file() and manifest.is_file():
+        if (ROOT / "dist").exists():
+            shutil.move(str(ROOT / "dist"), str(backup / "dist"))
+        (ROOT / "dist").mkdir()
+        shutil.copy2(archive, ROOT / "dist" / archive.name)
+        shutil.copy2(manifest, ROOT / "dist" / manifest.name)
     return backup
 
 

@@ -6,9 +6,9 @@
 
 ## 安装
 
-Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复制到支持SKILL.md的工具的技能目录中；Codex通常为 `~/.codex/skills/BNU-psy-thesis`，Claude Code通常为 `~/.claude/skills/BNU-psy-thesis`。只复制SKILL.md会缺少规则与脚本。
+Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复制到当前 agent 的技能目录；具体位置由该 agent 的配置或文档决定。只复制SKILL.md会缺少规则与脚本。
 
-每次执行任务前会检查 `references/update.json` 指定的 GitHub Releases。更新包经过哈希校验和回归测试后备份旧版并覆盖；网络不可用时使用本地版本。校内检测为可选步骤，首次使用由用户提供账号和邮箱，凭据保存到 `~/.claude/secrets/BNU-psy-thesis-site.json`，不进入项目目录。
+每次执行任务前会检查 `references/update.json` 指定的 GitHub Releases。更新包经过哈希校验和回归测试后备份旧版并覆盖；网络不可用时使用本地版本。校内检测为可选步骤，首次使用由用户提供账号和邮箱，凭据保存到系统用户配置目录，Windows 使用 `%APPDATA%`，其他系统使用 `XDG_CONFIG_HOME` 或 `~/.config`，不进入项目目录。
 
 机构规范固定为所附来源版本；其他学校或新版规范须提供自己的profile和来源，不能直接声称通用高校格式。
 
@@ -22,7 +22,7 @@ Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复�
 
 代理读取SKILL.md，清点论文、确认角色、运行排版和检查、更新实际目录并渲染逐页核验。自动排版不等同于学术内容审查，最终检查记录会区分已通过项目与待复核项目。
 
-命令行用法和计划格式见 `PROJECT.md`、`references/plan-and-review.md`。规则和来源对照见 `references/requirements.md`。脚本拒绝覆盖输入和已有输出；每次迭代使用新文件名。
+命令行用法和计划格式见 `references/plan-and-review.md`。规则和来源对照见 `references/requirements.md`。脚本拒绝覆盖输入和已有输出；每次迭代使用新文件名。
 
 ## 开源边界
 
@@ -35,4 +35,4 @@ python -m unittest discover -s tests -v
 python scripts/package_skill.py --out dist
 ```
 
-产物为 `dist/BNU-psy-thesis.skill`，本质为可解压ZIP。打包使用明确白名单，避免把本机论文、备份和测试产物上传。项目不会自动推送代码；论文只有用户明确授权后才上传至检测入口。
+产物为 `dist/BNU-psy-thesis.skill`，本质为可解压ZIP。本地只保留这个当前版本，旧版自动移入 `_local/release-history/`。打包使用明确白名单，避免把本机论文、备份和测试产物上传。项目不会自动推送代码；论文只有用户明确授权后才上传至检测入口。

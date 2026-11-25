@@ -1,6 +1,7 @@
 """Configure the university detector, test login, or upload an authorized DOCX."""
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -9,7 +10,11 @@ import time
 import requests
 
 ROOT = Path(__file__).resolve().parents[1]
-CREDENTIALS = Path.home() / ".claude" / "secrets" / "BNU-psy-thesis-site.json"
+if sys.platform == "win32":
+    CONFIG_BASE = Path(os.environ.get("APPDATA", str(Path.home() / "AppData" / "Roaming")))
+else:
+    CONFIG_BASE = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config")))
+CREDENTIALS = CONFIG_BASE / "BNU-psy-thesis" / "site-credentials.json"
 
 
 def load_public_config():

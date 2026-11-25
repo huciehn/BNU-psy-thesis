@@ -340,6 +340,10 @@ class EngineTests(unittest.TestCase):
         (staged / 'SKILL.md').write_text('---\nname: BNU-psy-thesis\n---\n', encoding='utf-8')
         (staged / 'scripts').mkdir()
         (staged / 'scripts' / 'new_script.py').write_text('VALUE = 1\n', encoding='utf-8')
+        (staged_parent / 'BNU-psy-thesis.skill').write_bytes(b'new-release')
+        (staged_parent / 'manifest.json').write_text('{}', encoding='utf-8')
+        (old_root / 'dist').mkdir()
+        (old_root / 'dist' / 'old.skill').write_bytes(b'old-release')
         previous_root = update_skill.ROOT
         previous_cwd = Path.cwd()
         try:
@@ -352,6 +356,9 @@ class EngineTests(unittest.TestCase):
         self.assertEqual((old_root / 'SKILL.md').read_text(encoding='utf-8'), '---\nname: BNU-psy-thesis\n---\n')
         self.assertTrue((old_root / 'scripts' / 'new_script.py').is_file())
         self.assertEqual((backup / 'SKILL.md').read_text(encoding='utf-8'), 'old')
+        self.assertEqual((old_root / 'dist' / 'BNU-psy-thesis.skill').read_bytes(), b'new-release')
+        self.assertFalse((old_root / 'dist' / 'old.skill').exists())
+        self.assertEqual((backup / 'dist' / 'old.skill').read_bytes(), b'old-release')
 
 
 if __name__ == "__main__":
