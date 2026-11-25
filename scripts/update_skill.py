@@ -83,19 +83,48 @@ def install(staging_parent, expected_root):
     )
     if completed.returncode:
         raise ValueError("Release tests failed: " + (completed.stderr or completed.stdout)[-2000:])
+    root_files = {"SKILL.md", "README.md", "PROJECT.md", "LICENSE", "requirements.txt", "requirements-optional.txt", ".gitignore"}
+    trees = {"scripts": {".py"}, "references": {".md", ".json"}, "tests": {".py"}, "examples": {".json"}}
+    def public_files(base):
+        result = [base / name for name in root_files if (base / name).is_file()]
+        for directory, suffixes in trees.items():
+            for path in (base / directory).rglob("*"):
+                relative = path.relative_to(base)
+                if path.is_file() and path.suffix in suffixes and "__pycache__" not in relative.parts and "_local" not in relative.parts:
+                    result.append(path)
+        return result
     backups = ROOT.parent / ".BNU-psy-thesis-backups"
     backups.mkdir(parents=True, exist_ok=True)
     backup = backups / (uuid.uuid4().hex + "-previous")
-    os.replace(ROOT, backup)
+    backup.mkdir(parents=True)
+    old_files = public_files(ROOT)
+    for source in old_files:
+        relative = source.relative_to(ROOT)
+        target = backup / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+    new_files = public_files(staged)
+    new_relative = {path.relative_to(staged) for path in new_files}
     try:
-        os.replace(staged, ROOT)
+        for source in new_files:
+            relative = source.relative_to(staged)
+            target = ROOT / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            temporary = target.with_name(target.name + ".update-" + uuid.uuid4().hex)
+            shutil.copy2(source, temporary)
+            os.replace(temporary, target)
+        for old in old_files:
+            relative = old.relative_to(ROOT)
+            if relative not in new_relative and old.exists():
+                old.unlink()
     except Exception:
-        os.replace(backup, ROOT)
+        for source in backup.rglob("*"):
+            if source.is_file():
+                relative = source.relative_to(backup)
+                target = ROOT / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
         raise
-    for name in (".git", "_local", "dist"):
-        preserved = backup / name
-        if preserved.exists() and not (ROOT / name).exists():
-            shutil.move(str(preserved), str(ROOT / name))
     return backup
 
 

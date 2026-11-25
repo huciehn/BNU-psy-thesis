@@ -1,6 +1,7 @@
 """Behavioral tests use isolated artifacts under the skill's _local directory."""
 import hashlib
 import json
+import os
 import sys
 import unittest
 import uuid
@@ -21,6 +22,7 @@ from docx_common import NS, paragraph_text, paragraphs, read_docx, sha256_file
 from format_docx import format_document
 from validate_docx import validate
 from build_docx import build
+import update_skill
 from update_skill import version_tuple
 from site_check import validate_credentials
 from make_cover import extract_logo, make_blocks
@@ -326,6 +328,30 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(blocks[1]['role'], 'cover_main_title')
         self.assertEqual(blocks[-1]['role'], 'cover_date')
         self.assertEqual(blocks[-2]['role'], 'blank')
+
+    def test_update_install_works_from_inside_skill_directory(self):
+        old_root = self.folder / 'installed'
+        staged_parent = self.folder / 'staging'
+        staged = staged_parent / 'BNU-psy-thesis'
+        old_root.mkdir()
+        (staged / 'tests').mkdir(parents=True)
+        (staged / 'tests' / 'test_minimal.py').write_text('import unittest\n\nclass MinimalTest(unittest.TestCase):\n    def test_release(self):\n        self.assertTrue(True)\n', encoding='utf-8')
+        (old_root / 'SKILL.md').write_text('old', encoding='utf-8')
+        (staged / 'SKILL.md').write_text('---\nname: BNU-psy-thesis\n---\n', encoding='utf-8')
+        (staged / 'scripts').mkdir()
+        (staged / 'scripts' / 'new_script.py').write_text('VALUE = 1\n', encoding='utf-8')
+        previous_root = update_skill.ROOT
+        previous_cwd = Path.cwd()
+        try:
+            update_skill.ROOT = old_root
+            os.chdir(old_root)
+            backup = update_skill.install(staged_parent, 'BNU-psy-thesis')
+        finally:
+            os.chdir(previous_cwd)
+            update_skill.ROOT = previous_root
+        self.assertEqual((old_root / 'SKILL.md').read_text(encoding='utf-8'), '---\nname: BNU-psy-thesis\n---\n')
+        self.assertTrue((old_root / 'scripts' / 'new_script.py').is_file())
+        self.assertEqual((backup / 'SKILL.md').read_text(encoding='utf-8'), 'old')
 
 
 if __name__ == "__main__":
