@@ -11,13 +11,22 @@ python "S/scripts/validate_docx.py" "P/formatted.docx" --plan "P/plan.json" --or
 python "S/scripts/render_office.py" "P/formatted.docx" --backend wps --plan "P/plan.json" --output-dir "P/render"
 ```
 
-每次任务先运行 `python "S/scripts/update_skill.py" --auto`。发布配置在`references/update.json`，更新包必须附带同名技能压缩包和manifest.json，哈希及回归测试通过后才覆盖，旧版自动备份。
+每次任务先运行 `python "S/scripts/update_skill.py" --auto`，再运行 `python "S/scripts/ensure_sources.py"`。发布配置在`references/update.json`，更新包必须附带同名技能压缩包和manifest.json，哈希及回归测试通过后才覆盖；临时恢复文件在更新结束后删除。
 
-首次校内检测运行 `python "S/scripts/site_check.py" --setup`，由用户输入账号、邮箱和入口。登录状态用 `--check` 验证。获得用户对当前文件的明确上传授权后运行：
+## 校内检测与反复迭代
+
+本地排版、实际渲染和检查结束后，先把本轮DOCX/PDF和检查结果交付用户，再让用户选择是否进行内网检测。检测是可选项，账号配置与上传都发生在用户选择之后。
+
+- 用户自行检测：使用`references/site.json`中的公开入口自行上传。本轮检测结束后，用户可把DOCX、PDF或TXT报告放到P并告知路径，由代理分析报告。
+- 用户授权代传：首次选择代传时运行 `python "S/scripts/site_check.py" --setup`，由用户输入账号、邮箱和入口；登录状态用 `--check` 验证。获得对当前文件的明确上传授权后运行：
 
 ```text
 python "S/scripts/site_check.py" --upload "P/final.docx" --report-dir "P/site-report" --language 中文 --yes
 ```
+
+报告必须对应当前DOCX。有效问题回到本轮原始输入调整plan，用新文件名生成新版本，再执行格式检查、实际渲染和逐页复核。用户可以再次自行检测或授权代传，按“报告→修改→渲染→复核→再检测”反复迭代，直到用户决定停止。不得覆盖原稿或上一轮报告。
+
+用户选择不检测时，正常交付本地排版结果并注明“未进行内网检测”。网站报告与实际分页、内容保真共同判断，不能只凭网站结果宣布合格。
 
 新写作需要封面时，默认使用`assets/cover-template.docx`首页模板，用户也可提供新版官方样例替换。以下命令提取首页校徽并在内容文件前加入检测兼容封面；已有封面须审阅后显式使用`--replace-cover`：
 
