@@ -1,6 +1,6 @@
 {
   "id": "bnu-psychology-2021",
-  "version": "2.4.5",
+  "version": "2.5.0",
   "authority": "北京师范大学心理学部毕业论文写作规范（用户提供的2021修订材料）",
   "scope": "本科毕业论文；开题报告按独立专项规则处理",
   "page": {
@@ -22,6 +22,8 @@
     "cover_meta": {"preserve": true},
     "cover_date": {"preserve": true},
     "cover_other": {"preserve": true},
+    "integrity_statement": {"preserve": true},
+    "authorization_statement": {"preserve": true},
     "abstract_title_cn": {"cn_font": "黑体", "size_pt": 16, "bold": true, "align": "center", "first_line_chars": 0},
     "abstract_title_en": {"cn_font": "Times New Roman", "size_pt": 16, "bold": true, "align": "center", "first_line_chars": 0},
     "abstract_label_cn": {"cn_font": "黑体", "size_pt": 15, "bold": true, "align": "center", "first_line_chars": 0, "before_lines": 0, "after_lines": 0},

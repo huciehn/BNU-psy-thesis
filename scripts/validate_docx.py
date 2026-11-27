@@ -395,6 +395,26 @@ def validate(path, plan, original=None, review=None, mode="thesis", language="cn
         if chinese: chinese_ref_seen = True
         elif chinese_ref_seen: error("REFERENCE_ORDER", pid, "English references must precede Chinese references")
 
+    declaration_positions = {
+        role: next((positions[pid] for pid, item in roles.items() if item.get("role") == role and pid in positions), None)
+        for role in ("integrity_statement", "authorization_statement")
+    }
+    if all(position is not None for position in declaration_positions.values()):
+        first, second = sorted(declaration_positions.values())
+        for position in range(first, second + 1):
+            paragraph = ps[position]
+            if paragraph.xpath('.//w:br[@w:type="page"]', namespaces=NS):
+                error("DECLARATION_SPLIT", "document", "Integrity and authorization statements must remain on the same page")
+                break
+            page_before = paragraph.find("w:pPr/w:pageBreakBefore", NS)
+            if on(page_before):
+                error("DECLARATION_SPLIT", "document", "Do not force a page break between the two statements")
+                break
+            section = paragraph.find("w:pPr/w:sectPr", NS)
+            if position < second and section is not None and attr(section.find("w:type", NS), "val", "nextPage") != "continuous":
+                error("DECLARATION_SPLIT", "document", "Do not start a new page between the two statements")
+                break
+
     # Verify each physical section's properties and footer references, not cached page numbers.
     sections = []
     start = 0
@@ -473,8 +493,14 @@ def validate(path, plan, original=None, review=None, mode="thesis", language="cn
         if not must_odd or pid not in positions:
             continue
         idx = positions[pid]
-        matched = next((s for begin, end, s in sections if begin == idx), None)
-        if matched is None or attr(matched.find("w:type", NS), "val") != "oddPage":
+        matched = next((record for record in sections if record[0] <= idx <= record[1]), None)
+        leading_is_blank = matched is not None and all(
+            blank_paragraph(paragraph)
+            and not paragraph.xpath('.//w:br[@w:type="page"]', namespaces=NS)
+            and not on(paragraph.find('w:pPr/w:pageBreakBefore', NS))
+            for paragraph in ps[matched[0]:idx]
+        )
+        if matched is None or attr(matched[2].find("w:type", NS), "val") != "oddPage" or not leading_is_blank:
             error("ODD_SECTION", pid, "This component must begin an odd-page section")
 
     tbls = doc.findall(".//w:body//w:tbl", NS)

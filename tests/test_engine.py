@@ -2,8 +2,10 @@
 import hashlib
 import json
 import os
+import shutil
 import sys
 import unittest
+from unittest import mock
 import uuid
 import zipfile
 import struct
@@ -19,7 +21,7 @@ from lxml import etree
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from docx_common import NS, paragraph_text, paragraphs, read_docx, sha256_file
-from format_docx import format_document
+from format_docx import format_document, preserve_unformatted, clean_footer, prepare_sections
 from validate_docx import validate
 from build_docx import build
 import update_skill
@@ -29,7 +31,7 @@ from make_cover import extract_logo, make_blocks
 from render_office import pad_before_body, restore_media_bytes
 
 
-def create_fixture(folder, full=False, form=False):
+def create_fixture(folder, full=False, form=False, declarations=False):
     d = Document()
     role_by_text = {}
 
@@ -42,6 +44,10 @@ def create_fixture(folder, full=False, form=False):
         p("论文格式示例", "cover_title")
         p("姓名：示例作者", "cover_meta")
         p("2026年10月", "cover_date")
+        if declarations:
+            p("北京师范大学本科生毕业论文（设计）诚信承诺书", "integrity_statement")
+            p("声明正文仅用于测试分页保护。", "cover_other")
+            p("北京师范大学本科生毕业论文（设计）使用授权书", "authorization_statement")
         p("论文格式示例中文题目", "abstract_title_cn")
         p("摘  要", "abstract_label_cn")
         p("本段仅为排版验证用文本，不代表真实研究。", "abstract_body_cn")
@@ -123,9 +129,10 @@ class EngineTests(unittest.TestCase):
     def setUp(self):
         self.folder = ROOT / "_local/tests" / uuid.uuid4().hex
         self.folder.mkdir(parents=True)
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
 
-    def formatted(self, full=False, form=False):
-        src, plan_path, plan = create_fixture(self.folder, full, form)
+    def formatted(self, full=False, form=False, declarations=False):
+        src, plan_path, plan = create_fixture(self.folder, full, form, declarations)
         data, changes = format_document(src, plan_path)
         out = self.folder / "formatted.docx"; out.write_bytes(data)
         return src, out, plan, changes
@@ -147,6 +154,30 @@ class EngineTests(unittest.TestCase):
         self.assertIn("physical_odd_pages", report["pending_reviews"])
         settings = read_docx(out)['word/settings.xml']
         self.assertIn(b'doNotCompressPictures', settings)
+
+    def test_declarations_and_unformatted_copy_are_preserved(self):
+        src, out, plan, _ = self.formatted(full=True, declarations=True)
+        preserved = preserve_unformatted(src, self.folder / 'formatted-output.docx')
+        self.assertEqual(preserved.read_bytes(), src.read_bytes())
+        second = preserve_unformatted(src, self.folder / 'formatted-output.docx')
+        self.assertNotEqual(preserved, second)
+        report = validate(out, plan, src)
+        self.assertTrue(report['structural_pass'], report['errors'])
+        parts = read_docx(out)
+        root = etree.fromstring(parts['word/document.xml'])
+        authorization = next(p for p in paragraphs(root) if paragraph_text(p) == '北京师范大学本科生毕业论文（设计）使用授权书')
+        prop = authorization.find('w:pPr', NS)
+        if prop is None:
+            prop = OxmlElement('w:pPr')
+            authorization.insert(0, prop)
+        prop.append(OxmlElement('w:pageBreakBefore'))
+        damaged = self.folder / 'split-declarations.docx'
+        parts['word/document.xml'] = etree.tostring(root)
+        with zipfile.ZipFile(damaged, 'w') as z:
+            for name, data in parts.items():
+                z.writestr(name, data)
+        report = validate(damaged, plan, src)
+        self.assertIn('DECLARATION_SPLIT', {e['rule'] for e in report['errors']}, report['errors'])
 
     def test_form_is_not_converted_to_research_table(self):
         src, out, plan, changes = self.formatted(form=True)
@@ -317,6 +348,12 @@ class EngineTests(unittest.TestCase):
             validate_credentials('123', 'test@example.edu.cn')
         with self.assertRaises(ValueError):
             validate_credentials('202421161111', 'invalid')
+        response = mock.Mock()
+        response.json.return_value = {'tag_name': 'v2.4.5'}
+        with mock.patch.object(update_skill.requests, 'get', return_value=response) as request:
+            release = update_skill.get_release('owner/repository', 'v2.4.5')
+        self.assertEqual(release['tag_name'], 'v2.4.5')
+        self.assertIn('/releases/tags/v2.4.5', request.call_args.args[0])
 
     def test_cover_uses_user_supplied_template_logo(self):
         src, _, _ = create_fixture(self.folder)
@@ -352,16 +389,45 @@ class EngineTests(unittest.TestCase):
         try:
             update_skill.ROOT = old_root
             os.chdir(old_root)
-            backup = update_skill.install(staged_parent, 'BNU-psy-thesis')
+            update_skill.install(staged_parent, 'BNU-psy-thesis')
         finally:
             os.chdir(previous_cwd)
             update_skill.ROOT = previous_root
         self.assertEqual((old_root / 'SKILL.md').read_text(encoding='utf-8'), '---\nname: BNU-psy-thesis\n---\n')
         self.assertTrue((old_root / 'scripts' / 'new_script.py').is_file())
-        self.assertEqual((backup / 'SKILL.md').read_text(encoding='utf-8'), 'old')
+        self.assertFalse(any(staged_parent.glob('.transaction-*')))
+        self.assertFalse((old_root.parent / '.BNU-psy-thesis-backups').exists())
         self.assertEqual((old_root / 'dist' / 'BNU-psy-thesis.skill').read_bytes(), b'new-release')
         self.assertFalse((old_root / 'dist' / 'old.skill').exists())
-        self.assertEqual((backup / 'dist' / 'old.skill').read_bytes(), b'old-release')
+
+    def test_existing_blank_section_start_is_reused_for_odd_page(self):
+        root = etree.fromstring(('''<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>
+          <w:p><w:r><w:t>封面</w:t></w:r></w:p>
+          <w:p><w:pPr><w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr></w:pPr></w:p>
+          <w:p/>
+          <w:bookmarkEnd w:id="1"/>
+          <w:p><w:r><w:t>中文题目</w:t></w:r></w:p>
+          <w:sectPr><w:pgSz w:w="11906" w:h="16838"/></w:sectPr>
+        </w:body></w:document>''').encode('utf-8'))
+        ps = paragraphs(root)
+        records, _ = prepare_sections(root, ps, {'p00003': {'role': 'abstract_title_cn'}}, json.loads((ROOT / 'references/profile.json').read_text(encoding='utf-8')))
+        self.assertEqual(len(records), 2)
+        self.assertEqual(records[-1][2].find('w:type', NS).get(qn('w:val')), 'oddPage')
+        self.assertEqual(records[-1][0], 2)
+
+    def test_textbox_page_field_does_not_block_footer_rebuild(self):
+        footer = etree.fromstring(('''<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:p><w:r><w:pict><w:txbxContent><w:p>
+            <w:r><w:fldChar w:fldCharType="begin"/></w:r>
+            <w:r><w:instrText> PAGE </w:instrText></w:r>
+            <w:r><w:fldChar w:fldCharType="separate"/></w:r>
+            <w:r><w:t>1</w:t></w:r>
+            <w:r><w:fldChar w:fldCharType="end"/></w:r>
+          </w:p></w:txbxContent></w:pict></w:r></w:p>
+        </w:ftr>''').encode('utf-8'))
+        cleaned = clean_footer(footer, 'textbox-footer')
+        self.assertEqual(cleaned.xpath('.//w:instrText/text()', namespaces=NS), [])
+        self.assertIsNotNone(cleaned.find('.//w:pict', NS))
 
     def test_bundled_cover_template(self):
         document = Document(ROOT / 'assets' / 'cover-template.docx')

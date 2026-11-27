@@ -11,6 +11,7 @@ import io
 import json
 import posixpath
 import re
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -529,6 +530,19 @@ def prepare_sections(root, ps, mapping, profile):
         idx = body.index(target)
         if idx == 0:
             continue
+        current = next((record for record in section_records(body) if record[0] <= idx <= record[1]), None)
+        if current is not None:
+            leading = list(body)[current[0]:idx]
+            reusable = all(
+                node.tag in (qn('w:bookmarkStart'), qn('w:bookmarkEnd'))
+                or (node.tag == qn('w:p') and not has_content(node)
+                    and node.find('w:pPr/w:sectPr', NS) is None
+                    and not node.xpath('.//w:br[@w:type="page"]', namespaces=NS)
+                    and node.find('w:pPr/w:pageBreakBefore', NS) is None)
+                for node in leading
+            )
+            if reusable:
+                continue
         prev = body[idx-1]
         if prev.tag == qn('w:p') and prev.find('w:pPr/w:sectPr', NS) is not None:
             continue
@@ -580,7 +594,7 @@ def clean_footer(root, name):
         if re.match(r'^\s*PAGE(?:\s|$)', simple.get(qn('w:instr'), ''), re.I):
             simple.getparent().remove(simple)
     for p in list(root.xpath('.//w:p', namespaces=NS)):
-        instr = ''.join(p.xpath('.//w:instrText/text()', namespaces=NS))
+        instr = ''.join(p.xpath('./w:r/w:instrText/text()', namespaces=NS))
         if not re.search(r'\bPAGE\b', instr, re.I):
             continue
         # Complex fields are safe only when the PAGE field is the complete
@@ -825,6 +839,22 @@ def format_document(input_path, plan_path, profile_path=None):
             z.writestr(name, data)
     return buf.getvalue(), report
 
+def preserve_unformatted(input_path, output_path):
+    input_path = Path(input_path)
+    output_path = Path(output_path)
+    base = output_path.parent / (input_path.stem + '_未排版')
+    candidate = base.with_suffix('.docx')
+    number = 2
+    while candidate.exists():
+        candidate = base.with_name(base.name + '_' + str(number)).with_suffix('.docx')
+        number += 1
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    with input_path.open('rb') as source, candidate.open('xb') as target:
+        shutil.copyfileobj(source, target)
+    shutil.copystat(input_path, candidate)
+    return candidate
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path)
@@ -840,7 +870,9 @@ def main():
         for path in (args.output, args.report):
             if path.exists():
                 raise ValueError('Refusing to overwrite existing output: %s' % path)
+        preserved = preserve_unformatted(args.input, args.output)
         data, report = format_document(args.input, args.plan, args.profile)
+        report['unformatted_copy'] = str(preserved)
         report['output_sha256'] = __import__('hashlib').sha256(data).hexdigest()
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.report.parent.mkdir(parents=True, exist_ok=True)
@@ -849,7 +881,7 @@ def main():
         with args.report.open('x', encoding='utf-8') as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
             f.write('\n')
-        print('Formatted DOCX: %s\nVerification report: %s' % (args.output, args.report))
+        print('Formatted DOCX: %s\nUnformatted original: %s\nVerification report: %s' % (args.output, preserved, args.report))
     except Exception as e:
         print('ERROR: %s' % e, file=sys.stderr)
         return 2

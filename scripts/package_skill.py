@@ -3,7 +3,6 @@ import argparse
 import hashlib
 import json
 import re
-import shutil
 import uuid
 import zipfile
 from pathlib import Path
@@ -39,32 +38,33 @@ def package(output_dir):
     target = output_dir / "BNU-psy-thesis.skill"
     manifest = output_dir / "manifest.json"
     output_dir.mkdir(parents=True, exist_ok=True)
-    if target.exists() or manifest.exists() or (output_dir.resolve() == (ROOT / "dist").resolve() and any(output_dir.iterdir())):
-        history = ROOT / "_local" / "release-history" / uuid.uuid4().hex
-        history.mkdir(parents=True)
-        for path in (target, manifest):
-            if path.exists():
-                shutil.move(str(path), str(history / path.name))
-        if output_dir.resolve() == (ROOT / "dist").resolve():
-            for path in list(output_dir.iterdir()):
-                if path.is_dir():
-                    shutil.move(str(path), str(history / path.name))
+    temporary_target = output_dir / ("." + target.name + "." + uuid.uuid4().hex + ".tmp")
+    temporary_manifest = output_dir / (".manifest." + uuid.uuid4().hex + ".tmp")
     records = []
-    with target.open("xb") as handle:
-        with zipfile.ZipFile(handle, "w", zipfile.ZIP_DEFLATED) as z:
-            for file in files:
-                relative = file.relative_to(ROOT).as_posix()
-                data = file.read_bytes()
-                z.writestr("BNU-psy-thesis/" + relative, data)
-                records.append({"path": relative, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
-    result = {"version": "2.4.5", "archive": target.name,
-              "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
-              "files": records, "excluded": ["_local", "dist", "private source documents", "credentials"]}
-    with manifest.open("x", encoding="utf-8") as handle: json.dump(result, handle, ensure_ascii=False, indent=2)
-    with zipfile.ZipFile(target) as z:
-        if z.testzip() is not None: raise ValueError("Release ZIP failed integrity check")
-        if any("/_local/" in n or "/dist/" in n for n in z.namelist()):
-            raise ValueError("Private artifacts entered the release")
+    try:
+        with temporary_target.open("xb") as handle:
+            with zipfile.ZipFile(handle, "w", zipfile.ZIP_DEFLATED) as z:
+                for file in files:
+                    relative = file.relative_to(ROOT).as_posix()
+                    data = file.read_bytes()
+                    z.writestr("BNU-psy-thesis/" + relative, data)
+                    records.append({"path": relative, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
+        version = json.loads((ROOT / "references/profile.json").read_text(encoding="utf-8"))["version"]
+        result = {"version": version, "archive": target.name,
+                  "sha256": hashlib.sha256(temporary_target.read_bytes()).hexdigest(),
+                  "files": records, "excluded": ["_local", "dist", "private source documents", "credentials"]}
+        with temporary_manifest.open("x", encoding="utf-8") as handle:
+            json.dump(result, handle, ensure_ascii=False, indent=2)
+        with zipfile.ZipFile(temporary_target) as z:
+            if z.testzip() is not None:
+                raise ValueError("Release ZIP failed integrity check")
+            if any("/_local/" in n or "/dist/" in n for n in z.namelist()):
+                raise ValueError("Private artifacts entered the release")
+        temporary_target.replace(target)
+        temporary_manifest.replace(manifest)
+    finally:
+        temporary_target.unlink(missing_ok=True)
+        temporary_manifest.unlink(missing_ok=True)
     return target, result
 
 

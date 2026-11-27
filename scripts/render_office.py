@@ -31,7 +31,7 @@ def restore_media_bytes(source, rendered):
     temporary.replace(rendered)
 
 
-def render_once(source, output_dir, backend, executable=None):
+def render_once(source, output_dir, backend, executable=None, plan=None):
     if output_dir.exists() and any(output_dir.iterdir()):
         raise ValueError("Use a new or empty output directory; no outputs are overwritten")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -41,6 +41,7 @@ def render_once(source, output_dir, backend, executable=None):
     pdf = output_dir.resolve() / "rendered.pdf"
     pages = None
     section_pages = []
+    component_pages = []
     if backend in ("word", "wps"):
         try:
             import win32com.client
@@ -71,6 +72,19 @@ def render_once(source, output_dir, backend, executable=None):
                 section_pages.append({"section": i, "physical_page": int(rng.Information(3)),
                                       "numbered_page": int(rng.Information(1)),
                                       "section_start": int(sec.PageSetup.SectionStart)})
+            if plan:
+                reviewed_roles = {"abstract_title_cn", "abstract_title_en", "toc_title", "heading1",
+                                  "reference_heading", "appendix_heading_single", "appendix_heading_multi",
+                                  "ack_heading", "integrity_statement", "authorization_statement"}
+                for pid, spec in plan["paragraphs"].items():
+                    role = spec.get("role")
+                    if role not in reviewed_roles:
+                        continue
+                    name = "bnu_psy_thesis_" + pid
+                    if not doc.Bookmarks.Exists(name):
+                        raise ValueError("Reviewed paragraph bookmark is missing after Office update: " + name)
+                    component_pages.append({"paragraph": pid, "role": role,
+                                            "physical_page": int(doc.Bookmarks(name).Range.Information(3))})
             try:
                 doc.SaveAs2(str(updated), FileFormat=12)
             except AttributeError:
@@ -105,7 +119,7 @@ def render_once(source, output_dir, backend, executable=None):
         raise ValueError("Office did not produce a nonempty PDF")
     report = {"backend": backend, "source_sha256": before, "rendered_pdf_sha256": sha(pdf),
               "updated_docx_sha256": sha(updated) if updated else None, "page_count": pages,
-              "sections": section_pages,
+              "sections": section_pages, "component_pages": component_pages,
               "editable_fields_saved": updated is not None, "all_pages_visual": False,
               "status": "rendered_pending_visual_and_structural_review"}
     (output_dir / "render.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -151,17 +165,30 @@ def render(source, output_dir, backend, executable=None, plan_path=None):
         raise ValueError("Use a new or empty output directory")
     output_dir.mkdir(parents=True, exist_ok=True)
     plan = json.loads(plan_path.read_text(encoding="utf-8-sig"))
-    first = render_once(source, output_dir / "pass1", backend, executable)
+    first = render_once(source, output_dir / "pass1", backend, executable, plan)
     body = next((s for s in first["sections"] if s["numbered_page"] == 1 and s["section"] > 1), None)
     result, final_dir = first, output_dir / "pass1"
     if body and body["physical_page"] % 2 == 0:
         padded = output_dir / "physical-padding.docx"
         pad_before_body(source, padded, plan)
-        result = render_once(padded, output_dir / "pass2", backend, executable)
+        result = render_once(padded, output_dir / "pass2", backend, executable, plan)
         final_dir = output_dir / "pass2"
+    pages = {(item["paragraph"], item["role"]): item["physical_page"] for item in result.get("component_pages", [])}
+    odd_roles = {"abstract_title_cn", "abstract_title_en", "toc_title", "reference_heading", "appendix_heading_single", "ack_heading"}
+    odd_pages = [page for (pid, role), page in pages.items() if role in odd_roles]
+    first_body_pid = next((pid for pid, spec in plan["paragraphs"].items() if spec.get("role") == "heading1"), None)
+    first_appendix_pid = next((pid for pid, spec in plan["paragraphs"].items() if spec.get("role") == "appendix_heading_multi"), None)
+    for pid in (first_body_pid, first_appendix_pid):
+        if pid:
+            odd_pages.extend(page for (item_pid, role), page in pages.items() if item_pid == pid)
+    result["physical_odd_components_verified"] = all(page % 2 == 1 for page in odd_pages)
     result["physical_odd_sections_verified"] = all(s["physical_page"] % 2 == 1 for s in result["sections"] if s["section_start"] == 4)
-    if not result["physical_odd_sections_verified"]:
+    declaration_pages = [page for (pid, role), page in pages.items() if role in ("integrity_statement", "authorization_statement")]
+    result["declarations_same_page_verified"] = len(declaration_pages) == 2 and declaration_pages[0] == declaration_pages[1] if declaration_pages else None
+    if not result["physical_odd_components_verified"] or not result["physical_odd_sections_verified"]:
         raise ValueError("Physical odd-page requirement still fails; inspect pass reports before further editing")
+    if result["declarations_same_page_verified"] is False:
+        raise ValueError("Integrity and authorization statements must remain on the same physical page")
     result["final_directory"] = final_dir.name
     (output_dir / "render-summary.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     return result

@@ -2,13 +2,13 @@
 
 将北师大心理学部本科毕业论文格式要求落实为可追溯规则、现有DOCX保真排版与独立验收。保留中文学术写作、开题报告及课程作业场景，按各场景实际要求选择规则。
 
-2.3版加入校内检测系统实测规则、GitHub Releases 自动更新、检测入口配置和官方样例封面提取。真实空行、标题对齐、图表题空格、附录格式及超宽对象缩放均有自动检查。检测兼容参数与正式规范差异记录在 `references/requirements.md`。
+2.5版明确物理奇数页规则，保护诚信承诺书与使用授权书同页，自动保存未排版原稿，并支持按GitHub版本号退回。2.3版加入校内检测系统实测规则、GitHub Releases 自动更新、检测入口配置和官方样例封面提取。真实空行、标题对齐、图表题空格、附录格式及超宽对象缩放均有自动检查。检测兼容参数与正式规范差异记录在 `references/requirements.md`。
 
 ## 安装
 
 Python 3.9以上，安装 `requirements.txt`。将整个BNU-psy-thesis目录复制到当前 agent 的技能目录；具体位置由该 agent 的配置或文档决定。只复制SKILL.md会缺少规则与脚本。
 
-每次执行任务前会检查 `references/update.json` 指定的 GitHub Releases。更新包经过哈希校验和回归测试后备份旧版并覆盖；网络不可用时使用本地版本。校内检测为可选步骤，首次使用由用户提供账号和邮箱，凭据保存到系统用户配置目录，Windows 使用 `%APPDATA%`，其他系统使用 `XDG_CONFIG_HOME` 或 `~/.config`，不进入项目目录。
+每次执行任务前会检查 `references/update.json` 指定的 GitHub Releases。更新包经过哈希校验和回归测试后覆盖本地文件，只保留最新版本；失败恢复使用临时副本，完成后自动删除。运行 `python scripts/update_skill.py --version v2.4.5` 可退回指定历史版本，把版本号换成目标版本即可。网络不可用时使用本地版本。校内检测为可选步骤，首次使用由用户提供账号和邮箱，凭据保存到系统用户配置目录，Windows 使用 `%APPDATA%`，其他系统使用 `XDG_CONFIG_HOME` 或 `~/.config`，不进入项目目录。
 
 机构规范固定为所附来源版本；其他学校或新版规范须提供自己的profile和来源，不能直接声称通用高校格式。
 
@@ -35,4 +35,4 @@ python -m unittest discover -s tests -v
 python scripts/package_skill.py --out dist
 ```
 
-产物为 `dist/BNU-psy-thesis.skill`，本质为可解压ZIP。本地只保留这个当前版本，旧版自动移入 `_local/release-history/`。打包使用明确白名单，避免把本机论文、备份和测试产物上传。项目不会自动推送代码；论文只有用户明确授权后才上传至检测入口。
+产物为 `dist/BNU-psy-thesis.skill`，本质为可解压ZIP。打包直接替换当前发布文件，不保留本地历史副本。打包使用明确白名单，避免把本机论文、备份和测试产物上传。项目不会自动推送代码；论文只有用户明确授权后才上传至检测入口。

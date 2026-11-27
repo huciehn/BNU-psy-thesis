@@ -1,4 +1,4 @@
-"""Check GitHub Releases and install a tested update with a local backup."""
+"""Install a tested GitHub release without retaining local backup copies."""
 import argparse
 import json
 import os
@@ -28,14 +28,19 @@ def local_version():
     return profile["version"]
 
 
-def latest_release(repository):
+def get_release(repository, version=None):
+    suffix = "/releases/latest" if version is None else "/releases/tags/" + version
     response = requests.get(
-        f"https://api.github.com/repos/{repository}/releases/latest",
+        f"https://api.github.com/repos/{repository}{suffix}",
         headers={"Accept": "application/vnd.github+json", "User-Agent": "BNU-psy-thesis-update"},
         timeout=15,
     )
     response.raise_for_status()
     return response.json()
+
+
+def latest_release(repository):
+    return get_release(repository)
 
 
 def asset_url(release, name):
@@ -93,9 +98,7 @@ def install(staging_parent, expected_root):
                 if path.is_file() and path.suffix in suffixes and "__pycache__" not in relative.parts and "_local" not in relative.parts:
                     result.append(path)
         return result
-    backups = ROOT.parent / ".BNU-psy-thesis-backups"
-    backups.mkdir(parents=True, exist_ok=True)
-    backup = backups / (uuid.uuid4().hex + "-previous")
+    backup = staging_parent / (".transaction-" + uuid.uuid4().hex)
     backup.mkdir(parents=True)
     old_files = public_files(ROOT)
     for source in old_files:
@@ -105,6 +108,7 @@ def install(staging_parent, expected_root):
         shutil.copy2(source, target)
     new_files = public_files(staged)
     new_relative = {path.relative_to(staged) for path in new_files}
+    old_relative = {path.relative_to(ROOT) for path in old_files}
     try:
         for source in new_files:
             relative = source.relative_to(staged)
@@ -117,7 +121,20 @@ def install(staging_parent, expected_root):
             relative = old.relative_to(ROOT)
             if relative not in new_relative and old.exists():
                 old.unlink()
+        archive = staging_parent / "BNU-psy-thesis.skill"
+        manifest = staging_parent / "manifest.json"
+        if archive.is_file() and manifest.is_file():
+            if (ROOT / "dist").exists():
+                shutil.move(str(ROOT / "dist"), str(backup / "dist"))
+            (ROOT / "dist").mkdir()
+            shutil.copy2(archive, ROOT / "dist" / archive.name)
+            shutil.copy2(manifest, ROOT / "dist" / manifest.name)
     except Exception:
+        for source in new_files:
+            relative = source.relative_to(staged)
+            target = ROOT / relative
+            if relative not in old_relative and target.is_file():
+                target.unlink()
         for source in backup.rglob("*"):
             if source.is_file():
                 relative = source.relative_to(backup)
@@ -125,54 +142,58 @@ def install(staging_parent, expected_root):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source, target)
         raise
-    archive = staging_parent / "BNU-psy-thesis.skill"
-    manifest = staging_parent / "manifest.json"
-    if archive.is_file() and manifest.is_file():
-        if (ROOT / "dist").exists():
-            shutil.move(str(ROOT / "dist"), str(backup / "dist"))
-        (ROOT / "dist").mkdir()
-        shutil.copy2(archive, ROOT / "dist" / archive.name)
-        shutil.copy2(manifest, ROOT / "dist" / manifest.name)
-    return backup
+    finally:
+        shutil.rmtree(backup, ignore_errors=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--auto", action="store_true", help="Install when a newer release exists")
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--auto", action="store_true", help="Install when a newer release exists")
+    action.add_argument("--version", help="Install a selected release, including an older version")
     args = parser.parse_args()
     result = {"status": "unknown", "local_version": local_version(), "updated": False}
     try:
         config = json.loads((ROOT / "references/update.json").read_text(encoding="utf-8"))
-        release = latest_release(config["repository"])
+        if args.version:
+            version_tuple(args.version)
+        release = get_release(config["repository"], args.version)
         latest = release["tag_name"]
         result["latest_version"] = latest
-        if version_tuple(latest) <= version_tuple(result["local_version"]):
+        install_release = bool(args.version)
+        if args.version:
+            result["status"] = "selected_version"
+        elif version_tuple(latest) <= version_tuple(result["local_version"]):
             result["status"] = "up_to_date"
         else:
             result["status"] = "update_available"
-            if args.auto:
-                asset_name = config.get("asset", "BNU-psy-thesis.skill")
-                archive_url = asset_url(release, asset_name)
-                manifest_url = asset_url(release, "manifest.json")
-                if not archive_url or not manifest_url:
-                    raise ValueError("Latest release lacks the skill archive or manifest")
-                staging = Path(tempfile.mkdtemp(prefix="BNU-psy-thesis-update-", dir=ROOT.parent))
-                try:
-                    archive = staging / asset_name
-                    manifest = staging / "manifest.json"
-                    download(archive_url, archive)
-                    download(manifest_url, manifest)
-                    validate_archive(archive, manifest, "BNU-psy-thesis")
-                    backup = install(staging, "BNU-psy-thesis")
-                    result.update({"updated": True, "status": "updated", "backup": str(backup)})
-                finally:
-                    shutil.rmtree(staging, ignore_errors=True)
+            install_release = args.auto
+        if install_release:
+            asset_name = config.get("asset", "BNU-psy-thesis.skill")
+            archive_url = asset_url(release, asset_name)
+            manifest_url = asset_url(release, "manifest.json")
+            if not archive_url or not manifest_url:
+                raise ValueError("Selected release lacks the skill archive or manifest")
+            staging = Path(tempfile.mkdtemp(prefix="BNU-psy-thesis-update-", dir=ROOT.parent))
+            try:
+                archive = staging / asset_name
+                manifest = staging / "manifest.json"
+                download(archive_url, archive)
+                download(manifest_url, manifest)
+                validate_archive(archive, manifest, "BNU-psy-thesis")
+                install(staging, "BNU-psy-thesis")
+                result.update({"updated": True, "status": "updated"})
+            finally:
+                shutil.rmtree(staging, ignore_errors=True)
     except Exception as exc:
-        result["status"] = "network_or_update_unavailable" if not args.auto else "update_failed"
+        result["status"] = "update_failed" if args.auto or args.version else "network_or_update_unavailable"
         result["message"] = str(exc)
         if args.auto:
             print(json.dumps(result, ensure_ascii=False))
             return 0
+        if args.version:
+            print(json.dumps(result, ensure_ascii=False))
+            return 1
     print(json.dumps(result, ensure_ascii=False))
     return 0
 

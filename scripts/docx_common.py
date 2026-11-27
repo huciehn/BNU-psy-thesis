@@ -132,6 +132,12 @@ def suggested_role(p):
     if match:
         return 'toc' + match.group(1), True
     compact = re.sub(r'\s+', '', text)
+    declarations = {
+        '北京师范大学本科生毕业论文（设计）诚信承诺书': 'integrity_statement',
+        '北京师范大学本科生毕业论文（设计）使用授权书': 'authorization_statement',
+    }
+    if compact in declarations:
+        return declarations[compact], True
     fixed = {'摘要': 'abstract_label_cn', 'ABSTRACT': 'abstract_label_en', '目录': 'toc_title', 'Contents': 'toc_title',
              '参考文献': 'reference_heading', 'References': 'reference_heading', '致谢': 'ack_heading'}
     if compact in fixed:
