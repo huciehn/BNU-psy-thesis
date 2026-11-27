@@ -179,6 +179,46 @@ class EngineTests(unittest.TestCase):
         report = validate(damaged, plan, src)
         self.assertIn('DECLARATION_SPLIT', {e['rule'] for e in report['errors']}, report['errors'])
 
+    def test_front_layout_survives_misclassified_cover_role(self):
+        src, pp, plan = create_fixture(self.folder, full=True)
+        parts = read_docx(src)
+        root = etree.fromstring(parts['word/document.xml'])
+        cover = next(p for p in paragraphs(root) if paragraph_text(p) == '姓名：示例作者')
+        prop = OxmlElement('w:pPr')
+        spacing = OxmlElement('w:spacing')
+        spacing.set(qn('w:line'), '321')
+        spacing.set(qn('w:lineRule'), 'exact')
+        prop.append(spacing)
+        cover.insert(0, prop)
+        run_prop = OxmlElement('w:rPr')
+        size = OxmlElement('w:sz')
+        size.set(qn('w:val'), '26')
+        run_prop.append(size)
+        cover.find('w:r', NS).insert(0, run_prop)
+        margin = root.find('w:body/w:sectPr/w:pgMar', NS)
+        margin.set(qn('w:top'), '999')
+        parts['word/document.xml'] = etree.tostring(root)
+        with zipfile.ZipFile(src, 'w') as z:
+            for name, data in parts.items():
+                z.writestr(name, data)
+        cover_pid = next(pid for pid, item in plan['paragraphs'].items() if item['role'] == 'cover_meta')
+        plan['paragraphs'][cover_pid]['role'] = 'body'
+        plan['input_sha256'] = sha256_file(src)
+        pp.write_text(json.dumps(plan, ensure_ascii=False), encoding='utf-8')
+        data, changes = format_document(src, pp)
+        out = self.folder / 'cover-preserved.docx'
+        out.write_bytes(data)
+        result = etree.fromstring(read_docx(out)['word/document.xml'])
+        preserved = next(p for p in paragraphs(result) if paragraph_text(p) == '姓名：示例作者')
+        self.assertEqual(preserved.find('w:pPr/w:spacing', NS).get(qn('w:line')), '321')
+        self.assertEqual(preserved.find('w:r/w:rPr/w:sz', NS).get(qn('w:val')), '26')
+        sections = result.xpath('.//w:sectPr', namespaces=NS)
+        self.assertEqual(sections[0].find('w:pgMar', NS).get(qn('w:top')), '999')
+        self.assertEqual(sections[-1].find('w:pgMar', NS).get(qn('w:top')), '1417')
+        self.assertGreater(changes['preserved_front_paragraphs'], 0)
+        report = validate(out, plan, src)
+        self.assertTrue(report['structural_pass'], report['errors'])
+
     def test_form_is_not_converted_to_research_table(self):
         src, out, plan, changes = self.formatted(form=True)
         report = validate(out, plan, src, mode="partial")

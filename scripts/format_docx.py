@@ -516,8 +516,11 @@ def prepare_sections(root, ps, mapping, profile):
     boundaries = []
     first_body = None
     first_appendix = None
+    first_abstract = None
     for i, p in enumerate(ps):
         role = mapping.get('p%05d' % i, {}).get('role')
+        if role == 'abstract_title_cn' and first_abstract is None:
+            first_abstract = p
         if role == 'heading1' and first_body is None:
             first_body = p
         if role in ('appendix_heading_single', 'appendix_heading_multi') and first_appendix is None:
@@ -559,11 +562,14 @@ def prepare_sections(root, ps, mapping, profile):
     children = list(body)
     records = section_records(body)
     body_start_index = body.index(first_body) if first_body is not None else None
+    front_end_index = body.index(first_abstract) if first_abstract is not None else None
     targets = {body.index(p) for p in boundaries}
     first_body_section = None
     for k, (start, end, sp) in enumerate(records):
         if any(start <= i <= end for i in targets):
             element(sp, 'w:type', {'w:val': 'oddPage'})
+        if front_end_index is not None and end < front_end_index:
+            continue
         pg = element(sp, 'w:pgSz')
         page = profile['page']
         landscape = pg.get(qn('w:orient')) == 'landscape' or (int(pg.get(qn('w:w'), '0') or 0) > int(pg.get(qn('w:h'), '0') or 0) > 0)
@@ -759,12 +765,19 @@ def format_document(input_path, plan_path, profile_path=None):
     ensure_styles(parts, profile)
     effective_roles = {}
     resized_images = 0
+    preserved_front_paragraphs = 0
+    body = root.find('w:body', NS)
+    front_limit = next((i for i, p in enumerate(ps) if plan['paragraphs'].get('p%05d' % i, {}).get('role') == 'abstract_title_cn'), None)
     for i, p in enumerate(ps):
         key = 'p%05d' % i
         if key not in plan['paragraphs']:
             continue
         spec = plan['paragraphs'][key]
         role = spec['role']
+        if front_limit is not None and i < front_limit and p.getparent() is body:
+            effective_roles[key] = role
+            preserved_front_paragraphs += 1
+            continue
         # Form tables use their independently specified line spacing; they must
         # not acquire a three-line research-table format.
         ancestor_table = next((a for a in p.iterancestors() if a.tag == qn('w:tbl')), None)
@@ -829,6 +842,7 @@ def format_document(input_path, plan_path, profile_path=None):
               'before': before, 'after': after, 'content_preserved': True,
               'paragraph_count': len(ps), 'table_count': len(ts), 'section_count': len(records),
               'inserted_blank_paragraphs': inserted_blanks, 'resized_images': resized_images,
+              'preserved_front_paragraphs': preserved_front_paragraphs,
               'effective_roles': effective_roles, 'changed_parts': changed, 'unchanged_parts': untouched,
               'unchanged_parts_byte_identical': True, 'manual_required': manual,
               'status': 'formatted_pending_render_and_review',

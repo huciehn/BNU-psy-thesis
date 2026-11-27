@@ -210,6 +210,8 @@ def validate(path, plan, original=None, review=None, mode="thesis", language="cn
             mapped[pid], positions[pid] = p, i
             roles[pid] = {"role": toc_role}
     seen_roles = [item.get("role") for item in roles.values()]
+    abstract_positions = [positions[p] for p, v in roles.items() if v.get("role") == "abstract_title_cn" and p in positions]
+    first_abstract = min(abstract_positions) if abstract_positions else None
     if mode == "thesis":
         for role in profile["requirements"]["mandatory_roles"]:
             if role not in seen_roles:
@@ -233,6 +235,8 @@ def validate(path, plan, original=None, review=None, mode="thesis", language="cn
             error("PLAN", pid, "Role bookmark is missing; cannot verify this paragraph")
             continue
         spec = dict(profile["defaults"], **profile["styles"][role])
+        if first_abstract is not None and positions[pid] < first_abstract and p.getparent() is doc.find("w:body", NS):
+            continue
         if role == "table_cell":
             parent = next(p.iterancestors(W + "tbl"), None)
             table_nodes = doc.findall(".//w:body//w:tbl", NS)
@@ -434,15 +438,16 @@ def validate(path, plan, original=None, review=None, mode="thesis", language="cn
     rel_targets = {r.get("Id"): r.get("Target") for r in rels}
     for si, (begin, end, section) in enumerate(sections):
         where = "section{}".format(si + 1)
-        pg = section.find("w:pgSz", NS)
-        landscape = attr(pg, "orient") == "landscape"
-        for key, mm in (("w", 297 if landscape else 210), ("h", 210 if landscape else 297)):
-            if abs(int(attr(pg, key, "0")) - round(mm / 25.4 * 1440)) > 2:
-                error("PAGE_SIZE", where, "Expected A4 paper size")
-        mar = section.find("w:pgMar", NS)
-        for key in ("top", "left", "bottom", "right"):
-            if abs(int(attr(mar, key, "0")) - round(profile["page"][key + "_mm"] / 25.4 * 1440)) > 2:
-                error("MARGIN", where, "Incorrect {} margin".format(key))
+        if first_abstract is None or end >= first_abstract:
+            pg = section.find("w:pgSz", NS)
+            landscape = attr(pg, "orient") == "landscape"
+            for key, mm in (("w", 297 if landscape else 210), ("h", 210 if landscape else 297)):
+                if abs(int(attr(pg, key, "0")) - round(mm / 25.4 * 1440)) > 2:
+                    error("PAGE_SIZE", where, "Expected A4 paper size")
+            mar = section.find("w:pgMar", NS)
+            for key in ("top", "left", "bottom", "right"):
+                if abs(int(attr(mar, key, "0")) - round(profile["page"][key + "_mm"] / 25.4 * 1440)) > 2:
+                    error("MARGIN", where, "Incorrect {} margin".format(key))
         in_body = first_body is not None and begin >= first_body
         footer_refs = section.findall("w:footerReference", NS)
         has_page = False
