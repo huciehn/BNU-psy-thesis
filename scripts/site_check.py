@@ -109,7 +109,7 @@ def main():
     parser.add_argument("--upload", type=Path)
     parser.add_argument("--report-dir", type=Path)
     parser.add_argument("--language", choices=("中文", "英文"), default="中文")
-    parser.add_argument("--yes", action="store_true", help="Confirm that this DOCX may be sent to the configured detector")
+    parser.add_argument("--yes", action="store_true", help="Confirm user authorization for this upload or the current auto-iteration series")
     args = parser.parse_args()
     public = load_public_config()
     try:
@@ -134,7 +134,7 @@ def main():
             return 0
         if args.upload:
             if not args.yes:
-                raise ValueError("Upload requires --yes after the user authorizes this document transfer")
+                raise ValueError("Upload requires --yes after authorization for this upload or the current auto-iteration series")
             if not args.report_dir:
                 raise ValueError("--report-dir is required")
             saved = upload_and_download(session, entry, args.upload.resolve(), args.report_dir.resolve(), args.language, credentials)
