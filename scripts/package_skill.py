@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ROOT_FILES = ("SKILL.md", "README.md", "LICENSE", "requirements.txt", "requirements-optional.txt", ".gitignore")
-TREES = {"scripts": {".py"}, "references": {".md", ".json"}, "tests": {".py"}, "examples": {".json"}, "assets": {".docx"}}
+TREES = {"scripts": {".py"}, "references": {".md", ".json"}, "tests": {".py"}, "examples": {".json"}, "assets": {".doc", ".docx", ".pdf", ".md"}}
 
 
 def collect():
@@ -29,7 +29,7 @@ def package(output_dir):
         raise ValueError("Missing skill description")
     files = collect()
     for path in files:
-        if path.suffix == ".docx":
+        if path.suffix in (".doc", ".docx", ".pdf"):
             continue
         text = path.read_text(encoding="utf-8")
         # Detect machine-specific absolute user paths; do not echo any secret contents.
@@ -52,7 +52,7 @@ def package(output_dir):
         version = json.loads((ROOT / "references/profile.json").read_text(encoding="utf-8"))["version"]
         result = {"version": version, "archive": target.name,
                   "sha256": hashlib.sha256(temporary_target.read_bytes()).hexdigest(),
-                  "files": records, "excluded": ["_local", "dist", "private source documents", "credentials"]}
+                  "files": records, "excluded": ["_local", "dist", "private papers and audits", "credentials"]}
         with temporary_manifest.open("x", encoding="utf-8") as handle:
             json.dump(result, handle, ensure_ascii=False, indent=2)
         with zipfile.ZipFile(temporary_target) as z:

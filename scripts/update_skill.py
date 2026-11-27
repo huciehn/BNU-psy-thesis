@@ -89,7 +89,7 @@ def install(staging_parent, expected_root):
     if completed.returncode:
         raise ValueError("Release tests failed: " + (completed.stderr or completed.stdout)[-2000:])
     root_files = {"SKILL.md", "README.md", "LICENSE", "requirements.txt", "requirements-optional.txt", ".gitignore"}
-    trees = {"scripts": {".py"}, "references": {".md", ".json"}, "tests": {".py"}, "examples": {".json"}, "assets": {".docx"}}
+    trees = {"scripts": {".py"}, "references": {".md", ".json"}, "tests": {".py"}, "examples": {".json"}, "assets": {".doc", ".docx", ".pdf", ".md"}}
     def public_files(base):
         result = [base / name for name in root_files if (base / name).is_file()]
         for directory, suffixes in trees.items():

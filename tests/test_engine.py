@@ -29,6 +29,7 @@ from update_skill import version_tuple
 from site_check import validate_credentials
 from make_cover import extract_logo, make_blocks
 from render_office import pad_before_body, restore_media_bytes
+from ensure_sources import ensure_sources
 
 
 def create_fixture(folder, full=False, form=False, declarations=False):
@@ -468,6 +469,18 @@ class EngineTests(unittest.TestCase):
         cleaned = clean_footer(footer, 'textbox-footer')
         self.assertEqual(cleaned.xpath('.//w:instrText/text()', namespaces=NS), [])
         self.assertIsNotNone(cleaned.find('.//w:pict', NS))
+
+    def test_public_sources_and_legacy_update_recovery(self):
+        self.assertEqual(ensure_sources(ROOT), 8)
+        portable = self.folder / 'portable'
+        shutil.copytree(ROOT / 'assets/sources', portable / 'assets/sources')
+        (portable / 'references').mkdir(parents=True)
+        for name in ('sources.json', 'source-fallback.json'):
+            shutil.copy2(ROOT / 'references' / name, portable / 'references' / name)
+        fallback = json.loads((ROOT / 'references/source-fallback.json').read_text(encoding='utf-8'))
+        for item in fallback['sources']:
+            (portable / 'assets/sources' / item['filename']).unlink()
+        self.assertEqual(ensure_sources(portable), 8)
 
     def test_bundled_cover_template(self):
         document = Document(ROOT / 'assets' / 'cover-template.docx')

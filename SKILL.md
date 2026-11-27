@@ -11,12 +11,14 @@ license: MIT
 ## 依据
 
 - [格式规则与来源](references/requirements.md)：执行前读取；正式规范优先于自查表和排版样例。
+- [原始公开规范](assets/sources/)：8份校方DOC、DOCX、PDF原件，供第三方直接核查。
+- [来源清单与哈希](references/sources.json)：记录原始文件路径和SHA-256。
 - [机器参数](references/profile.json)：所有字号、行距、缩进、页边距等由脚本执行。
 - [命令、计划与验收](references/plan-and-review.md)：实施时读取；包含完整命令和数据格式。
 
 ## 执行
 
-0. 检查更新：首先运行 `python scripts/update_skill.py --auto`。检测到更新时下载、校验并运行测试，随后覆盖本地文件。更新不保留历史副本；需要退回时运行 `python scripts/update_skill.py --version vX.Y.Z` 选择GitHub历史版本。网络或更新失败时报告状态，并使用当前本地版本继续。
+0. 检查更新：首先运行 `python scripts/update_skill.py --auto`，随后运行 `python scripts/ensure_sources.py` 核对并恢复随包公开规范。检测到更新时下载、校验并运行测试，随后覆盖本地文件。更新不保留历史副本；需要退回时运行 `python scripts/update_skill.py --version vX.Y.Z` 选择GitHub历史版本。网络或更新失败时报告状态，并使用当前本地版本继续。
 1. 清点全文：运行 `scripts/inventory_docx.py`，审阅段落角色、表格类型和缺项；建议角色须确认后写入与输入哈希绑定的plan。任何预处理前先保存未排版原稿；`format_docx.py`也会自动保存直接输入的未排版副本。
 2. 修正格式：运行 `scripts/format_docx.py` 生成新副本。现有论文的封面及其前置声明整页保留原稿，包括分节页面设置、段落间距、行距、缩进和图片位置；不得擅自替换成内置封面模板。按语境指定参考文献、统计变量的真实斜体；中文文献同样适用。文本格式修改须记录前后对照，再重新清点。
 3. 独立检查：运行 `scripts/validate_docx.py`。返回1表示错误，2表示待复核；`--structural-only`通过不等于完整验收。
